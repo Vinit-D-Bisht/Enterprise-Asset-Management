@@ -8,6 +8,7 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+*.tsbuildinfo
 
 # Node
 node_modules/
@@ -29,5 +30,6 @@ uploads/
 
 # Tests
 .pytest_cache/
+pytest-cache-files-*/
 .coverage
 htmlcov/
