@@ -40,7 +40,7 @@ the API enforces permissions and business invariants for every workflow.
 
 ## Local startup (PowerShell)
 
-Prerequisites: Docker Desktop with Compose, Python 3.12+, Node.js 20.9+, and
+Prerequisites: Docker Desktop with Compose, Python 3.12+, Node.js 20.19+, and
 npm. From the repository root:
 
 ```powershell

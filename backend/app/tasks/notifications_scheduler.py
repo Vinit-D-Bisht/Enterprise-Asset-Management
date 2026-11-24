@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 from sqlalchemy import select
 
@@ -8,6 +9,7 @@ from app.database.session import SessionLocal
 from app.models import MaintenancePlan, Notification, Role, User, Warranty
 
 logger = logging.getLogger("eamms.notifications")
+HEARTBEAT_FILE = Path("/tmp/eamms-notifications.last-success")
 
 
 def deliver_due_notifications(today: date | None = None) -> int:
@@ -80,10 +82,12 @@ def main() -> None:
     while True:
         try:
             created = deliver_due_notifications()
+            HEARTBEAT_FILE.touch()
             logger.info("Notification run complete; created=%d", created)
+            time.sleep(24 * 60 * 60)
         except Exception:
             logger.exception("Notification run failed")
-        time.sleep(24 * 60 * 60)
+            time.sleep(60)
 
 
 if __name__ == "__main__":

@@ -55,7 +55,7 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      test: ["CMD", "node", "-e", "const os=require('node:os'); const ip=Object.values(os.networkInterfaces()).flat().find(n => n && n.family==='IPv4' && !n.internal)?.address; if(!ip) process.exit(1); fetch('http://'+ip+':3000/login').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -78,6 +78,12 @@ services:
       api:
         condition: service_healthy
     command: ["python", "-m", "app.tasks.notifications_scheduler"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,sys,time; p='/tmp/eamms-notifications.last-success'; sys.exit(0 if os.path.isfile(p) and time.time()-os.path.getmtime(p)<90000 else 1)"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+      start_period: 2m
 
 volumes:
   postgres_data:
