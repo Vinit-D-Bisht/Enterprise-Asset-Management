@@ -26,3 +26,28 @@ def test_production_accepts_secure_database_cookie_and_origins():
         CORS_ORIGINS="https://eamms.example.com",
     )
     assert config.cors_origin_list == ["https://eamms.example.com"]
+    with pytest.raises(ValidationError, match="PostgreSQL"):
+        Settings(
+            _env_file=None,
+            DATABASE_URL="sqlite://",
+            JWT_SECRET_KEY="a-unique-production-secret-with-more-than-32-characters",
+            APP_ENV="production",
+            COOKIE_SECURE=True,
+            CORS_ORIGINS="https://eamms.example.com",
+        )
+
+
+def test_company_currency_is_iso_4217_and_defaults_to_inr():
+    config = Settings(
+        _env_file=None,
+        DATABASE_URL="sqlite://",
+        JWT_SECRET_KEY="test-secret-key-with-at-least-32-characters",
+    )
+    assert config.COMPANY_CURRENCY == "INR"
+    with pytest.raises(ValidationError, match="ISO 4217"):
+        Settings(
+            _env_file=None,
+            DATABASE_URL="sqlite://",
+            JWT_SECRET_KEY="test-secret-key-with-at-least-32-characters",
+            COMPANY_CURRENCY="ZZZ",
+        )

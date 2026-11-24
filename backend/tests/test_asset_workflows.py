@@ -15,6 +15,8 @@ def test_asset_allocation_return_transfer_warranty_qr_and_audit(
     )
     assert allocated.status_code == 201, allocated.text
     assert allocated.json()["user_id"] == employee_id
+    manager_asset = client.get(f"/api/v1/assets/{asset_id}", headers=manager)
+    assert manager_asset.json()["company_currency"] == "INR"
 
     duplicate = client.post(
         f"/api/v1/assets/{asset_id}/allocate",
@@ -164,6 +166,33 @@ def test_employee_cannot_allocate_and_cannot_view_other_users_history(
         headers={"Authorization": f"Bearer {other_login.json()['access_token']}"},
     )
     assert denied.status_code == 403
+
+
+def test_assignment_history_only_returns_requesters_own_rows(
+    client, users, auth_headers, basic_asset
+):
+    asset_id = basic_asset["id"]
+    manager = auth_headers[Role.ASSET_MANAGER.value]
+    first_user = users[Role.EMPLOYEE.value]
+    second_user = users[Role.TECHNICIAN.value]
+    client.post(
+        f"/api/v1/assets/{asset_id}/allocate",
+        headers=manager,
+        json={"user_id": str(first_user)},
+    )
+    client.post(f"/api/v1/assets/{asset_id}/return", headers=manager, json={})
+    client.post(
+        f"/api/v1/assets/{asset_id}/allocate",
+        headers=manager,
+        json={"user_id": str(second_user)},
+    )
+    own_history = client.get(
+        f"/api/v1/assets/{asset_id}/assignments",
+        headers=auth_headers[Role.EMPLOYEE.value],
+    )
+    assert own_history.status_code == 200
+    assert len(own_history.json()) == 1
+    assert own_history.json()[0]["user_id"] == str(first_user)
 
 
 def test_allocation_permission_matrix_for_all_roles(

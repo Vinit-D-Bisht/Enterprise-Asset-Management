@@ -7,7 +7,7 @@ import { api, ApiError } from "@/lib/api";
 
 type Dashboard = { total_assets: number; available_assets: number; assigned_assets: number; assets_in_repair: number; open_work_orders: number; overdue_work_orders: number; maintenance_due: number; warranties_expiring_30_days: number };
 type DepreciationRow = { asset_id: string; asset_tag: string; name: string; purchase_cost: string; residual_value: string; accumulated_depreciation: string; book_value: string; as_of_date: string };
-type DepreciationReport = { as_of_date: string; currency_code: string; items: DepreciationRow[]; total: number; page: number; page_size: number; total_cost: string; total_accumulated_depreciation: string; total_book_value: string };
+type DepreciationReport = { as_of_date: string; company_currency: string; items: DepreciationRow[]; total: number; page: number; page_size: number; total_cost: string; total_accumulated_depreciation: string; total_book_value: string };
 type AuditRow = { id: string; actor_id: string | null; action: string; entity_type: string; entity_id: string; details: Record<string, unknown>; created_at: string };
 
 function todayLocal() {
@@ -47,7 +47,7 @@ export default function ReportsPage() {
   }, [load]);
 
   const currency = (amount: string) => depreciation
-    ? new Intl.NumberFormat(undefined, { style: "currency", currency: depreciation.currency_code, maximumFractionDigits: 2 }).format(Number(amount))
+    ? new Intl.NumberFormat(undefined, { style: "currency", currency: depreciation.company_currency, maximumFractionDigits: 2 }).format(Number(amount))
     : amount;
 
   return <>
@@ -67,7 +67,7 @@ export default function ReportsPage() {
         <StatCard label="Warranties expiring in 30 days" value={dashboard.warranties_expiring_30_days} tone="violet" />
       </section>
       <section className="card card-pad section-block">
-        <div className="section-heading"><div><h2>Straight-line depreciation</h2><p className="muted">Daily proration from purchase date, capped at residual value. Currency: {depreciation?.currency_code ?? "configured company currency"}.</p></div>
+        <div className="section-heading"><div><h2>Straight-line depreciation</h2><p className="muted">Daily proration from purchase date, capped at residual value. Currency: {depreciation?.company_currency ?? "configured company currency"}.</p></div>
           <label className="field"><span>As of date</span><input type="date" value={asOfDate} onChange={(event) => { setPage(1); setAsOfDate(event.target.value); }} /></label>
         </div>
         {depreciation && <><div className="detail-grid"><div className="detail-cell"><small>Original cost</small><strong>{currency(depreciation.total_cost)}</strong></div><div className="detail-cell"><small>Accumulated depreciation</small><strong>{currency(depreciation.total_accumulated_depreciation)}</strong></div><div className="detail-cell"><small>Current book value</small><strong>{currency(depreciation.total_book_value)}</strong></div></div>

@@ -21,7 +21,7 @@ export type Asset = {
   vendor_id?: string | null;
   purchase_date?: string;
   purchase_cost?: string;
-  currency_code?: string;
+  company_currency?: string;
   residual_value?: string;
   useful_life_months?: number;
   status: "available" | "assigned" | "in_repair" | "retired";

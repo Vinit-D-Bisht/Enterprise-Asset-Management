@@ -74,7 +74,7 @@ def asset_payload(asset: Asset, include_financials: bool):
             vendor_id=asset.vendor_id,
             purchase_date=asset.purchase_date,
             purchase_cost=asset.purchase_cost,
-            currency_code=settings.CURRENCY_CODE,
+            company_currency=settings.COMPANY_CURRENCY,
             residual_value=asset.residual_value,
             useful_life_months=asset.useful_life_months,
         )
@@ -329,10 +329,12 @@ def asset_assignments(
         .options(selectinload(Assignment.user), selectinload(Assignment.asset))
         .order_by(Assignment.assigned_at.desc())
     ).all()
-    if actor.role in {Role.EMPLOYEE.value, Role.TECHNICIAN.value} and not any(
-        row.user_id == actor.id for row in rows
-    ):
-        raise HTTPException(403, "You cannot view another user's allocation history")
+    if actor.role in {Role.EMPLOYEE.value, Role.TECHNICIAN.value}:
+        rows = [row for row in rows if row.user_id == actor.id]
+        if not rows:
+            raise HTTPException(
+                403, "You cannot view another user's allocation history"
+            )
     return [
         AssignmentOutput(
             id=row.id,

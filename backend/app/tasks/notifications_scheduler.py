@@ -24,7 +24,6 @@ def deliver_due_notifications(today: date | None = None) -> int:
         plans = db.scalars(
             select(MaintenancePlan).where(
                 MaintenancePlan.is_active.is_(True),
-                MaintenancePlan.next_due_date >= today,
                 MaintenancePlan.next_due_date <= reminder_end,
             )
         ).all()

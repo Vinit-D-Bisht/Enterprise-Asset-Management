@@ -30,8 +30,9 @@ the API enforces permissions and business invariants for every workflow.
 - Asset, category, and location registers with search/pagination; allocation,
   return, transfer, retirement, assignment history, and QR code generation.
 - Vendor and warranty management; configurable ISO 4217 company currency.
-- Daily straight-line depreciation prorated from purchase date, capped at
-  residual value, with as-of reporting.
+- Daily straight-line depreciation prorated over the actual calendar-day life
+  from purchase date (including leap days), capped at residual value, with
+  as-of reporting.
 - Maintenance plans, work requests/orders, technician assignment, status and
   resolution tracking, notifications, audit history, dashboard and reports.
 - Database constraints and row locks protect key lifecycle operations and
@@ -47,15 +48,19 @@ if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
 Edit `.env` and set `JWT_SECRET_KEY` to a unique random value of at least 32
-characters. Set `CURRENCY_CODE` to the organization's ISO 4217 alpha-3 code.
+characters. Set `COMPANY_CURRENCY` to the organization's ISO 4217 alpha-3 code.
+For a deployment, set `CORS_ORIGINS` to the browser origin(s) and
+`NEXT_PUBLIC_API_BASE_URL` to the public API URL before building the web image.
+The frontend formats money using the API's `company_currency` response field,
+which comes from `COMPANY_CURRENCY`.
 Do not commit `.env`. Then launch the integrated stack:
 
 ```powershell
 docker compose up --build -d
 ```
 
-Compose starts PostgreSQL, applies Alembic migrations before starting the API,
-and starts the web app and daily notification scheduler. Create the first
+Compose starts PostgreSQL, applies Alembic migrations before the API becomes
+healthy, then starts the web app and daily notification scheduler. Create the first
 administrator (the command prompts securely for a password):
 
 ```powershell
@@ -96,9 +101,11 @@ npm run build
 The supplied `.env.example` credentials are for local development only. In a
 deployment use a managed secret store, TLS, `APP_ENV=production`,
 `COOKIE_SECURE=true`, explicit production CORS origins, database backups, and
-reviewed database access controls. Do not expose the development API docs
-publicly without an access policy. The readiness endpoint checks database
-connectivity; liveness does not.
+reviewed database access controls. Compose binds ports to loopback by default;
+publish the web app and API only through a TLS reverse proxy, and keep the
+database private. Do not expose the development API docs publicly without an
+access policy. The readiness endpoint checks database connectivity; liveness
+does not.
 
 See the implementation checklist for checks that need a local PostgreSQL and
 Docker environment and for current testing limits.

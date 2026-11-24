@@ -36,7 +36,7 @@ class DepreciationRow(BaseModel):
 
 class DepreciationReport(BaseModel):
     as_of_date: date
-    currency_code: str
+    company_currency: str
     items: list[DepreciationRow]
     total: int
     page: int

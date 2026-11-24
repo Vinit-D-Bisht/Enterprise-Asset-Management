@@ -66,10 +66,12 @@ public signup endpoint.
 - Every important state change writes an audit record in the same transaction.
 - Notifications are durable user-scoped records created with their triggering
   operation.
-- Straight-line depreciation is daily prorated from purchase date, capped at
-  the depreciable basis (cost minus residual value), and never reduces book
-  value below residual value. The report accepts an explicit as-of date.
-  Financial amounts use one configurable ISO 4217 company currency.
+- Straight-line depreciation is daily prorated over the actual calendar-day
+  useful-life interval from purchase date, including leap days, capped at the
+  depreciable basis (cost minus residual value), and never reduces book value
+  below residual value. The report accepts an explicit as-of date.
+  Financial amounts use one configurable ISO 4217 `COMPANY_CURRENCY` (default
+  `INR`), returned to the frontend as `company_currency`.
 
 ## API and frontend integration
 

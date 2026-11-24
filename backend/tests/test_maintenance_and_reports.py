@@ -1,8 +1,11 @@
 from datetime import date
 from decimal import Decimal
 
-from app.models import Asset, Role
+from sqlalchemy import select
+
+from app.models import Asset, Notification, Role
 from app.services.depreciation import depreciation_values
+from app.tasks import notifications_scheduler
 
 
 def test_work_order_request_assignment_and_completion(
@@ -97,6 +100,43 @@ def test_depreciation_straight_line_bounds_and_rounding():
     assert before_purchase == (Decimal("0.00"), Decimal("1200.00"))
 
 
+def test_depreciation_life_anniversary_uses_actual_leap_year_days():
+    asset = Asset(
+        purchase_cost=Decimal("1200.00"),
+        residual_value=Decimal("200.00"),
+        useful_life_months=12,
+        purchase_date=date(2024, 1, 1),
+    )
+    midway = depreciation_values(asset, date(2024, 7, 1))
+    anniversary = depreciation_values(asset, date(2025, 1, 1))
+    assert midway == (Decimal("497.27"), Decimal("702.73"))
+    assert anniversary == (Decimal("1000.00"), Decimal("200.00"))
+
+
+def test_reminder_scheduler_covers_overdue_plans_and_deduplicates(
+    client, database, auth_headers, basic_asset, monkeypatch
+):
+    manager = auth_headers[Role.ASSET_MANAGER.value]
+    plan = client.post(
+        "/api/v1/maintenance-plans",
+        headers=manager,
+        json={
+            "name": "Annual inspection",
+            "asset_id": basic_asset["id"],
+            "interval_days": 365,
+            "next_due_date": "2026-11-23",
+        },
+    )
+    assert plan.status_code == 201
+    monkeypatch.setattr(notifications_scheduler, "SessionLocal", database)
+    assert notifications_scheduler.deliver_due_notifications(date(2026, 11, 24)) == 2
+    assert notifications_scheduler.deliver_due_notifications(date(2026, 11, 24)) == 0
+    with database() as db:
+        rows = db.scalars(select(Notification)).all()
+        assert len(rows) == 2
+        assert all(row.dedupe_key for row in rows)
+
+
 def test_reports_are_role_protected_and_use_real_database_counts(
     client, auth_headers, basic_asset
 ):
@@ -109,8 +149,8 @@ def test_reports_are_role_protected_and_use_real_database_counts(
         "/api/v1/reports/depreciation?as_of_date=2025-01-01", headers=manager
     )
     assert depreciation.status_code == 200
-    # The purchase anniversary includes the 2024 leap day under daily proration.
-    assert depreciation.json()["total_book_value"] == "999.59"
+    # The actual 5-year calendar life includes the 2024 leap day.
+    assert depreciation.json()["total_book_value"] == "999.67"
     assert (
         client.get(
             "/api/v1/reports/dashboard", headers=auth_headers[Role.EMPLOYEE.value]

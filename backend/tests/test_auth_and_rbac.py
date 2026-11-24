@@ -9,6 +9,15 @@ def test_protected_routes_require_authentication(client):
     assert response.headers["www-authenticate"] == "Bearer"
 
 
+def test_login_rejects_untrusted_origin(client):
+    response = client.post(
+        "/api/v1/auth/login",
+        headers={"Origin": "https://attacker.example"},
+        json={"email": "administrator@example.com", "password": "irrelevant"},
+    )
+    assert response.status_code == 403
+
+
 def test_login_rejects_untrusted_browser_origin(client):
     response = client.post(
         "/api/v1/auth/login",

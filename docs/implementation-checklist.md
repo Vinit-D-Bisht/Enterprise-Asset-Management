@@ -8,7 +8,7 @@ verified, `[ ]` not implemented, `[!]` blocked by environment or missing input.
 - [x] FastAPI, SQLAlchemy 2, Pydantic 2, PostgreSQL, Alembic, Next.js,
   TypeScript, Tailwind, and a modular API/services/models/schemas structure.
 - [x] Architecture decision record, role matrix, lifecycle constraints,
-  configurable company currency, and daily depreciation policy.
+  `COMPANY_CURRENCY` (ISO 4217, default INR), and daily depreciation policy.
 - [x] Initial Alembic schema for the application entities; SQLite migration
   upgrade/downgrade/re-upgrade verified.
 - [x] Docker Compose definitions, container build files, local startup guide,
@@ -37,8 +37,9 @@ verified, `[ ]` not implemented, `[!]` blocked by environment or missing input.
 - [x] Allocation, return, transfers, asset retirement, ownership-aware history,
   and QR PNG generation; active assignment constrained in the database.
 - [x] Vendors, warranty records, and configurable ISO 4217 company currency.
-- [x] Daily straight-line depreciation from purchase date, capped at residual
-  value, with as-of and registry totals.
+- [x] Daily straight-line depreciation across actual calendar-life days from
+  purchase date (leap years included), capped at residual value, with as-of
+  and registry totals.
 - [x] Preventive maintenance plans, work requests/orders, assignment, guarded
   status progression, required completion resolution, and history.
 - [x] Durable in-app notifications for workflow events and scheduled warranty
@@ -52,13 +53,15 @@ verified, `[ ]` not implemented, `[!]` blocked by environment or missing input.
   users, work orders, reports, login, and notification inbox.
 - [x] Shared typed API client, bearer token memory, cookie refresh/retry, and
   loading/empty/success/validation/failure feedback.
-- [x] Backend: 29 pytest tests passed; Ruff lint/format checks passed; Python dependency
-  consistency passed; migration round-trip passed on SQLite.
+- [x] Backend: 35 pytest tests passed; Ruff lint/format and Python dependency
+  consistency checks passed; migration round-trip passed on SQLite.
+- [x] Alembic head migration graph reviewed and PostgreSQL SQL generation
+  succeeded offline; no live PostgreSQL migration was run.
 - [x] Frontend: ESLint, TypeScript check, 3 Vitest tests, optimized production
   build, and npm audit (0 vulnerabilities) passed.
 - [x] GitHub Actions CI defined for backend checks/migrations and frontend
   lint/tests/typecheck/build; workflow has not run on GitHub in this environment.
-- [!] PostgreSQL-specific migration/locking/concurrency checks and Compose
+- [!] PostgreSQL migration execution, locking/concurrency checks, and Compose
   startup/service health could not run: Docker is unavailable and no local
   PostgreSQL listener is available. SQLite is not a substitute for these.
 - [~] No browser automation or live frontend-to-PostgreSQL E2E test was run;

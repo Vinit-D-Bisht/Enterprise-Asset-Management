@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID, uuid4
 
@@ -180,8 +181,8 @@ class Asset(EntityMixin, Base):
     )
     vendor_id: Mapped[UUID | None] = mapped_column(ForeignKey("vendors.id"))
     purchase_date: Mapped[date] = mapped_column(Date, nullable=False)
-    purchase_cost: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
-    residual_value: Mapped[float] = mapped_column(
+    purchase_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    residual_value: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), nullable=False, default=0
     )
     useful_life_months: Mapped[int] = mapped_column(Integer, nullable=False)

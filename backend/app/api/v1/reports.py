@@ -208,7 +208,7 @@ def depreciation_report(
         total_book += book
     return DepreciationReport(
         as_of_date=as_of_date,
-        currency_code=settings.CURRENCY_CODE,
+        company_currency=settings.COMPANY_CURRENCY,
         items=items,
         total=total,
         page=page,

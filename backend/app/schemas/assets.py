@@ -93,7 +93,7 @@ class AssetOutput(BaseModel):
     vendor_id: UUID | None
     purchase_date: date
     purchase_cost: Decimal
-    currency_code: str
+    company_currency: str
     residual_value: Decimal
     useful_life_months: int
     status: str
