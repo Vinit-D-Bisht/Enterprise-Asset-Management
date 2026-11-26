@@ -89,6 +89,29 @@ export const api = {
   patch<T>(path: string, body: unknown) {
     return request<T>(path, { method: "PATCH", body: JSON.stringify(body) });
   },
+  delete<T>(path: string) {
+    return request<T>(path, { method: "DELETE" });
+  },
+  async download(path: string, filename: string) {
+    const blob = await request<Blob>(path);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
+  setupStatus() {
+    return request<{ setup_required: boolean }>("/setup/status", {}, false);
+  },
+  initialize(payload: { full_name: string; email: string; password: string; confirm_password: string; sample_data: boolean }) {
+    return request<{ setup_complete: boolean; sample_data_created: boolean; administrator: { id: string; full_name: string; email: string; role: string; is_active: boolean } }>(
+      "/setup/initial-admin", { method: "POST", body: JSON.stringify(payload) }, false,
+    );
+  },
   async login(email: string, password: string) {
     const result = await request<{ access_token: string }>(
       "/auth/login",

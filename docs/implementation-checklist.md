@@ -21,9 +21,17 @@ verified, `[ ]` not implemented, `[!]` blocked by environment or missing input.
 - [x] Administrator, Asset Manager, Technician, and Employee/Requester roles
   enforced by backend dependencies and ownership checks.
 - [x] Admin user creation/management, protected last active administrator,
-  and secure interactive initial-admin CLI.
+  secure interactive initial-admin CLI, and one-time transactional first-run
+  setup with optional sample data.
+- [x] Department CRUD with administrator-only backend authorization, unique
+  normalized names, user assignments, and reference-aware delete conflicts.
+- [x] Persistent Light, Dark, and System theme preferences across app routes.
 - [x] CORS allowlist, HttpOnly/SameSite refresh cookie, production secure-cookie
   requirement, sanitized validation responses, and current-user role reload.
+- [x] Persistent database-backed login throttling: five failed attempts per
+  email/IP pair and 30 per IP in a 15-minute window; identifiers are HMACed.
+- [x] JWT dependency audit: replaced python-jose/ecdsa with explicit HS256-only
+  PyJWT; requirements audit reports no known vulnerabilities.
 - [x] Asset financial details and custodian identity withheld from requester
   summary responses; finance fields protected on report endpoints.
 - [~] Threat-focused tests cover roles, auth, refresh replay, validation,
@@ -46,32 +54,40 @@ verified, `[ ]` not implemented, `[!]` blocked by environment or missing input.
   and maintenance reminders; user-scoped read state.
 - [x] Transactional audit events and role-protected audit/depreciation/dashboard
   reports.
+- [x] Protected depreciation and audit CSV exports; spreadsheet formula cells
+  are neutralized and audit exports omit event detail payloads.
 
 ## Frontend and quality
 
 - [x] Responsive authenticated Next.js screens for dashboard, assets, vendors,
-  users, work orders, reports, login, and notification inbox.
+  users, departments, catalogs, work orders, reports, login/setup, and
+  notification inbox.
 - [x] Shared typed API client, bearer token memory, cookie refresh/retry, and
   loading/empty/success/validation/failure feedback.
-- [x] Backend: 35 pytest tests passed; Ruff lint/format and Python dependency
-  consistency checks passed; migration round-trip passed on SQLite.
-- [x] Alembic head migration graph reviewed and PostgreSQL SQL generation
-  succeeded offline; no live PostgreSQL migration was run.
-- [x] Frontend: ESLint, TypeScript check, 3 Vitest tests, optimized production
+- [x] Backend: 64 pytest tests passed; Ruff lint/format, pip check, and pip-audit
+  passed. Migration chain was tested from a fresh PostgreSQL database and the
+  new throttle migration was applied additively to the existing PostgreSQL DB.
+- [x] Live PostgreSQL Department schema matches migration definitions,
+  including `ix_users_department_id`, the department FK, and normalized unique
+  index. Existing row counts and the named PostgreSQL data volume were preserved.
+- [x] Frontend: ESLint, TypeScript check, 16 Vitest tests, optimized production
   build, and npm audit (0 vulnerabilities) passed.
-- [x] GitHub Actions CI defined for backend checks/migrations and frontend
-  lint/tests/typecheck/build; workflow has not run on GitHub in this environment.
-- [!] PostgreSQL migration execution, locking/concurrency checks, and Compose
-  startup/service health could not run: Docker is unavailable and no local
-  PostgreSQL listener is available. SQLite is not a substitute for these.
-- [~] No browser automation or live frontend-to-PostgreSQL E2E test was run;
-  frontend API behavior is covered by unit tests, and backend APIs by SQLite
-  integration tests.
+- [x] Playwright browser suite: first-run setup with sample data, all four role
+  logins/menus, asset allocation/return/transfer, work orders/preventive plans,
+  reports and protected CSV downloads, role restrictions, three themes,
+  preference persistence, and a 390px responsive overflow check passed against
+  disposable PostgreSQL.
+- [x] PostgreSQL concurrency test submitted eight parallel invalid login
+  attempts; four returned 401 and subsequent attempts were throttled with 429.
+- [x] CI workflow includes a browser E2E job on an isolated Compose stack; it
+  has not run on GitHub from this environment.
 
 ## Remaining limits
 
 - Production deployment still requires externally managed TLS, a secret store,
   backups, monitoring, explicit production CORS, and an operational review.
+- Browser tests cover the initial setup with sample data; empty setup is covered
+  by backend tests, but has not been separately exercised in Playwright.
 - Email/SMS/push delivery is not configured; notifications are persisted and
   delivered through the in-app inbox.
 - The scheduler currently runs a daily reminder scan in one Compose worker;

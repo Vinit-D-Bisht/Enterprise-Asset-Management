@@ -4,7 +4,11 @@ export type User = {
   email: string;
   role: "administrator" | "asset_manager" | "technician" | "employee";
   is_active: boolean;
+  department_id?: string | null;
+  department_name?: string | null;
 };
+
+export type Department = { id: string; name: string; description: string | null; employee_count: number };
 
 export type Page<T> = { items: T[]; total: number; page: number; page_size: number };
 

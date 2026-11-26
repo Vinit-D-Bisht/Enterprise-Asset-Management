@@ -15,9 +15,9 @@
 
 ## Backend modules
 
-`api/v1` contains routers for authentication, users, assets, vendors, and
-maintenance. `services` contains authorization-aware business operations,
-audit recording, notifications, and depreciation calculation. `models` defines
+`api/v1` contains routers for authentication, first-run setup, users,
+departments, assets, vendors, and maintenance. `services` contains
+authorization-aware business operations, audit recording, notifications, and depreciation calculation. `models` defines
 relational entities and database constraints. `schemas` defines API contracts.
 `core` contains configuration, password/token handling, and access policies.
 
@@ -48,8 +48,13 @@ rotating refresh token. Only a hash of each refresh token is persisted. Refresh
 tokens are HttpOnly, SameSite cookies; logout revokes the current token. User
 role and active status are loaded from the database for each authenticated API
 request so role changes and account deactivation take effect immediately.
-Initial administrator creation is an explicit CLI operation, never an open
-public signup endpoint.
+The first administrator can be created once through the first-run wizard or
+the secure interactive CLI. The wizard checks for an existing administrator,
+commits the admin and optional sample dataset in one transaction, and serializes
+concurrent setup attempts. Existing installations skip the wizard. There is no
+public registration after setup. Department management is administrator-only;
+user department references are nullable and prevent deleting an assigned
+department.
 
 ## Core data and invariants
 
@@ -92,5 +97,8 @@ remains authoritative for every permission check.
   PostgreSQL concurrency and migration verification.
 - Frontend checks include typecheck, lint, production build, and component/API
   behavior tests where tooling is available.
-- CI runs Python and frontend checks. Docker Compose health is verified when
-  Docker is available.
+- Playwright runs the setup, four roles, asset and maintenance lifecycle,
+  protected report download, themes, persistence, and mobile-width checks against
+  a separate disposable PostgreSQL Compose stack.
+- CI runs Python, frontend, and browser E2E checks. PostgreSQL migration and
+  Compose health are verified against Docker when available.

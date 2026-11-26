@@ -10,7 +10,7 @@ psycopg[binary]==3.3.9
 pycountry==24.6.1
 pydantic-settings==2.16.3
 pytest==9.2.0
-python-jose==3.5.0
+PyJWT==2.15.1
 qrcode==8.2
 ruff==0.17.6
 SQLAlchemy==2.1.9

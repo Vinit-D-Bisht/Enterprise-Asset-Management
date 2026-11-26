@@ -3,9 +3,9 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
-from jose import JWTError, jwt
 
 from app.core.config import settings
 
@@ -42,7 +42,7 @@ def decode_access_token(token: str) -> UUID | None:
         if payload.get("type") != "access":
             return None
         return UUID(payload["sub"])
-    except (JWTError, KeyError, ValueError, TypeError):
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError):
         return None
 
 

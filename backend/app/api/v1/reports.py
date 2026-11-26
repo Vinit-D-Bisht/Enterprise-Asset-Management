@@ -1,7 +1,10 @@
+import csv
+import io
 from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -30,6 +33,36 @@ from app.schemas.reports import (
 from app.services.depreciation import depreciation_for_inputs, depreciation_values
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+
+
+def _csv_cell(value) -> str:
+    text_value = "" if value is None else str(value)
+    if text_value.lstrip(" \t\r\n").startswith(("=", "+", "-", "@")):
+        return "'" + text_value
+    return text_value
+
+
+def _csv_stream(headers: list[str], rows):
+    def generate():
+        buffer = io.StringIO(newline="")
+        writer = csv.writer(buffer, lineterminator="\r\n")
+        writer.writerow(headers)
+        yield "\ufeff" + buffer.getvalue()
+        for row in rows:
+            buffer.seek(0)
+            buffer.truncate(0)
+            writer.writerow([_csv_cell(value) for value in row])
+            yield buffer.getvalue()
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="eamms-report.csv"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 def dashboard_data(db: Session) -> DashboardOutput:
@@ -219,6 +252,48 @@ def depreciation_report(
     )
 
 
+@router.get("/depreciation.csv")
+def export_depreciation_csv(
+    as_of_date: date = Query(default_factory=date.today),
+    db: Session = Depends(get_db),
+    _: User = Depends(manager_or_admin),
+):
+    def rows():
+        assets = db.scalars(
+            select(Asset).order_by(Asset.asset_tag).execution_options(yield_per=500)
+        )
+        for asset in assets:
+            accumulated, book_value = depreciation_values(asset, as_of_date)
+            yield (
+                asset.asset_tag,
+                asset.name,
+                asset.purchase_cost,
+                asset.residual_value,
+                accumulated,
+                book_value,
+                settings.COMPANY_CURRENCY,
+                as_of_date.isoformat(),
+            )
+
+    response = _csv_stream(
+        [
+            "asset_tag",
+            "name",
+            "purchase_cost",
+            "residual_value",
+            "accumulated_depreciation",
+            "book_value",
+            "currency",
+            "as_of_date",
+        ],
+        rows(),
+    )
+    response.headers["Content-Disposition"] = (
+        'attachment; filename="eamms-depreciation.csv"'
+    )
+    return response
+
+
 @router.get("/audit", response_model=list[AuditOutput])
 def audit_report(
     entity_type: str | None = None,
@@ -238,3 +313,35 @@ def audit_report(
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
+
+
+@router.get("/audit.csv")
+def export_audit_csv(
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(admin_only),
+):
+    query = select(AuditLog)
+    if entity_type:
+        query = query.where(AuditLog.entity_type == entity_type)
+    if entity_id:
+        query = query.where(AuditLog.entity_id == entity_id)
+
+    def rows():
+        for event in db.scalars(
+            query.order_by(AuditLog.created_at.desc()).execution_options(yield_per=500)
+        ):
+            yield (
+                event.created_at.isoformat(),
+                event.action,
+                event.entity_type,
+                event.entity_id,
+                event.actor_id,
+            )
+
+    response = _csv_stream(
+        ["created_at", "action", "entity_type", "entity_id", "actor_id"], rows()
+    )
+    response.headers["Content-Disposition"] = 'attachment; filename="eamms-audit.csv"'
+    return response

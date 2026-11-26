@@ -1,6 +1,7 @@
 import pytest
+from sqlalchemy import select
 
-from app.models import Role
+from app.models import LoginThrottleBucket, RefreshSession, Role
 
 
 def test_protected_routes_require_authentication(client):
@@ -66,6 +67,31 @@ def test_login_refresh_rotation_and_reuse_revocation(client, users):
     assert after_replay.status_code == 401
 
 
+def test_logout_revokes_refresh_session_and_clears_cookie(client, users, database):
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "administrator@example.com",
+            "password": "correct-horse-battery-staple",
+        },
+    )
+    assert login.status_code == 200
+    refresh_token = client.cookies.get("eamms_refresh")
+    assert refresh_token
+
+    logout = client.post(
+        "/api/v1/auth/logout", headers={"Origin": "http://localhost:3000"}
+    )
+    assert logout.status_code == 204
+    assert "Max-Age=0" in logout.headers["set-cookie"]
+    with database() as db:
+        session = db.scalar(select(RefreshSession))
+        assert session is not None and session.revoked_at is not None
+
+    client.cookies.set("eamms_refresh", refresh_token)
+    assert client.post("/api/v1/auth/refresh").status_code == 401
+
+
 @pytest.mark.parametrize(
     ("role", "expected"),
     [
@@ -126,6 +152,50 @@ def test_validation_errors_do_not_echo_password(client):
     assert response.status_code == 422
     assert "sentinel-secret" not in response.text
     assert '"input"' not in response.text
+
+
+def test_login_rate_limit_blocks_repeated_invalid_passwords(client, users, database):
+    payload = {"email": "administrator@example.com", "password": "wrong-password"}
+    statuses = [
+        client.post("/api/v1/auth/login", json=payload).status_code for _ in range(5)
+    ]
+    assert statuses == [401, 401, 401, 401, 429]
+    blocked = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "administrator@example.com",
+            "password": "correct-horse-battery-staple",
+        },
+    )
+    assert blocked.status_code == 429
+    assert int(blocked.headers["retry-after"]) > 0
+    assert "administrator@example.com" not in blocked.text
+    with database() as db:
+        buckets = db.query(LoginThrottleBucket).all()
+        assert len(buckets) == 2
+        assert all("administrator@example.com" not in row.bucket_key for row in buckets)
+        assert all("testclient" not in row.bucket_key for row in buckets)
+
+
+def test_successful_login_clears_pair_failures(client, users, database):
+    for _ in range(2):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "administrator@example.com", "password": "wrong-password"},
+        )
+        assert response.status_code == 401
+    success = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "administrator@example.com",
+            "password": "correct-horse-battery-staple",
+        },
+    )
+    assert success.status_code == 200
+    with database() as db:
+        buckets = db.query(LoginThrottleBucket).all()
+        assert len(buckets) == 1
+        assert buckets[0].failure_count == 2
 
 
 def test_last_active_administrator_cannot_be_demoted_or_deactivated(

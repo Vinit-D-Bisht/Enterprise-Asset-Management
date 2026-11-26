@@ -40,7 +40,9 @@ def login(
     db: Session = Depends(get_db),
 ):
     validate_origin(request)
-    user, refresh = authenticate(db, data)
+    user, refresh = authenticate(
+        db, data, request.client.host if request.client else "unknown"
+    )
     set_refresh_cookie(response, refresh)
     return TokenOutput(access_token=create_access_token(user.id))
 

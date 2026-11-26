@@ -70,6 +70,16 @@ class EntityMixin(TimestampMixin):
     )
 
 
+class Department(EntityMixin, Base):
+    __tablename__ = "departments"
+    __table_args__ = (
+        Index("uq_departments_name_lower", text("lower(trim(name))"), unique=True),
+    )
+
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+
+
 class User(EntityMixin, Base):
     __tablename__ = "users"
     __table_args__ = (
@@ -88,10 +98,18 @@ class User(EntityMixin, Base):
         String(32), nullable=False, default=Role.EMPLOYEE.value
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    department_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("departments.id"), index=True
+    )
 
+    department: Mapped[Department | None] = relationship()
     refresh_sessions: Mapped[list["RefreshSession"]] = relationship(
         back_populates="user"
     )
+
+    @property
+    def department_name(self) -> str | None:
+        return self.department.name if self.department else None
 
 
 class RefreshSession(EntityMixin, Base):
@@ -114,6 +132,25 @@ class RefreshSession(EntityMixin, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     replaced_by_hash: Mapped[str | None] = mapped_column(String(64))
     user: Mapped[User] = relationship(back_populates="refresh_sessions")
+
+
+class LoginThrottleBucket(Base):
+    """Opaque per-email/IP login failure counters; never stores raw identifiers."""
+
+    __tablename__ = "login_throttle_buckets"
+    __table_args__ = (
+        CheckConstraint(
+            "failure_count >= 0", name="ck_login_throttle_failures_nonnegative"
+        ),
+        Index("ix_login_throttle_window_started", "window_started_at"),
+    )
+
+    bucket_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    window_started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    blocked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AssetCategory(EntityMixin, Base):

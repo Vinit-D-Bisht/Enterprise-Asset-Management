@@ -6,5 +6,5 @@ const root = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   resolve: { alias: { "@": resolve(root) } },
-  test: { environment: "node", include: ["lib/**/*.test.ts"], restoreMocks: true },
+  test: { environment: "node", include: ["lib/**/*.test.ts"], restoreMocks: true, pool: "threads", fileParallelism: false },
 });

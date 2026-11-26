@@ -158,3 +158,40 @@ def test_reports_are_role_protected_and_use_real_database_counts(
         == 403
     )
     assert client.get("/api/v1/reports/audit", headers=manager).status_code == 403
+
+
+def test_csv_exports_are_protected_and_stream_current_data(
+    client, auth_headers, basic_asset
+):
+    depreciation = client.get(
+        "/api/v1/reports/depreciation.csv?as_of_date=2025-01-01",
+        headers=auth_headers[Role.ASSET_MANAGER.value],
+    )
+    assert depreciation.status_code == 200
+    assert depreciation.headers["content-type"].startswith("text/csv")
+    assert depreciation.headers["content-disposition"] == (
+        'attachment; filename="eamms-depreciation.csv"'
+    )
+    assert "LAP-001" in depreciation.text
+    assert "Engineering laptop" in depreciation.text
+    assert "INR" in depreciation.text
+
+    forbidden = client.get(
+        "/api/v1/reports/audit.csv", headers=auth_headers[Role.ASSET_MANAGER.value]
+    )
+    assert forbidden.status_code == 403
+    audit = client.get(
+        "/api/v1/reports/audit.csv",
+        headers=auth_headers[Role.ADMINISTRATOR.value],
+    )
+    assert audit.status_code == 200
+    assert "asset.created" in audit.text
+    assert "password" not in audit.text.lower()
+
+
+def test_csv_formula_cells_are_neutralized():
+    from app.api.v1.reports import _csv_cell
+
+    assert _csv_cell('=HYPERLINK("https://example.invalid")').startswith("'=")
+    assert _csv_cell("  @SUM(A1:A2)").startswith("'  @")
+    assert _csv_cell("normal label") == "normal label"
