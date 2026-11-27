@@ -31,7 +31,33 @@ try {
 
     Push-Location (Join-Path $repoRoot "frontend")
     try {
-        & npm run e2e
+        & npm run e2e -- --grep-invert "empty first-run setup"
+        $testExit = $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
+    if ($testExit -ne 0) { throw "Sample-data browser suite failed." }
+
+    & docker @composeArgs down --remove-orphans
+    if ($LASTEXITCODE -ne 0) { throw "Could not stop the disposable E2E stack." }
+    & docker @composeArgs up --build --detach
+    if ($LASTEXITCODE -ne 0) { throw "Fresh empty-system E2E stack failed to start." }
+    $ready = $false
+    for ($attempt = 0; $attempt -lt 60; $attempt++) {
+        try {
+            $null = Invoke-RestMethod -Uri "$($env:EAMMS_E2E_WEB_URL)/login" -TimeoutSec 3
+            $null = Invoke-RestMethod -Uri "$($env:EAMMS_E2E_API_URL)/health/ready" -TimeoutSec 3
+            $ready = $true
+            break
+        } catch {
+            Start-Sleep -Seconds 2
+        }
+    }
+    if (-not $ready) { throw "Fresh empty-system E2E services did not become ready." }
+
+    Push-Location (Join-Path $repoRoot "frontend")
+    try {
+        & npm run e2e -- --grep "empty first-run setup"
         $testExit = $LASTEXITCODE
     } finally {
         Pop-Location

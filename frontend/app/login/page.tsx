@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Boxes, Check, CircleCheck, CircleHelp, LockKeyhole, ShieldCheck, Sparkles, Wrench } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
@@ -24,7 +24,8 @@ export default function LoginPage() {
   const [sampleData, setSampleData] = useState<boolean | null>(null);
   const [setupError, setSetupError] = useState("");
   const [setupBusy, setSetupBusy] = useState(false);
-  const [setupComplete, setSetupComplete] = useState(false);
+  const [setupSuccess, setSetupSuccess] = useState("");
+  const setupSubmissionInFlight = useRef(false);
 
   useEffect(() => { if (!loading && user) router.replace("/dashboard"); }, [loading, user, router]);
 
@@ -40,13 +41,21 @@ export default function LoginPage() {
     event.preventDefault(); setSetupError("");
     if (setupStep === 1) { const validation = validateSetupDetails({ full_name: setupName, email: setupEmail, password: setupPassword, confirm_password: setupConfirmation }); if (validation) { setSetupError(validation); return; } setSetupStep(2); return; }
     if (sampleData === null) { setSetupError("Choose whether to include sample data."); return; }
+    if (setupSubmissionInFlight.current) return;
+    setupSubmissionInFlight.current = true;
     setSetupBusy(true);
     try {
       const result = await api.initialize({ full_name: setupName.trim(), email: setupEmail.trim(), password: setupPassword, confirm_password: setupConfirmation, sample_data: sampleData });
       if (!result.setup_complete) throw new Error("Setup did not complete. Please try again.");
-      setSetupComplete(true);
+      setEmail(result.administrator.email);
+      setPassword("");
+      setSetupPassword("");
+      setSetupConfirmation("");
+      setSetupSuccess(result.sample_data_created ? "Workspace setup and sample data completed successfully. Sign in with your new Super Admin credentials." : "Workspace setup completed successfully. Sign in with your new Super Admin credentials.");
+      setSetupRequired(false);
+      setSetupStep(1);
     } catch (reason) { setSetupError(reason instanceof ApiError ? reason.message : reason instanceof Error ? reason.message : "Setup could not be completed. Please try again."); }
-    finally { setSetupBusy(false); }
+    finally { setupSubmissionInFlight.current = false; setSetupBusy(false); }
   }
 
   const busyOrChecking = loading || setupRequired === null;
@@ -76,9 +85,7 @@ export default function LoginPage() {
     <section className="login-form-panel">
       <div className="login-card">
         <div className="login-mobile-brand"><span className="brand-mark"><Boxes size={18} /></span><span><strong>EAMMS</strong><small>Asset operations platform</small></span></div>
-        {setupRequired ? setupComplete ? <>
-          <div className="login-form-icon login-success-icon"><Check size={20} /></div><p className="page-eyebrow">Workspace initialized</p><h2>Your EAMMS workspace is ready</h2><p>The initial Super Admin account has been created{sampleData ? " with sample data" : ""}. You can now sign in.</p><button className="button button-primary button-wide login-submit" type="button" onClick={() => router.replace("/login")}>Continue to sign in <ArrowRight size={16} /></button>
-        </> : <>
+        {setupRequired ? <>
         <div className="login-form-icon"><LockKeyhole size={19} /></div>
         <p className="page-eyebrow">First-run setup · Step {setupStep} of 3</p>
         <h2>{setupStep === 1 ? "Create your Super Admin" : "Configure your workspace"}</h2>
@@ -103,6 +110,7 @@ export default function LoginPage() {
         <p className="page-eyebrow">Welcome back</p>
         <h2>Sign in to your workspace</h2>
         <p>Use your organization account to continue to EAMMS.</p>
+        {setupSuccess && <p className="alert alert-success" role="status">{setupSuccess}</p>}
         <form className="form-stack" onSubmit={(event) => void submit(event)}>
           <label className="field"><span>Email address</span><input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" /></label>
           <label className="field"><span>Password</span><input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" /></label>

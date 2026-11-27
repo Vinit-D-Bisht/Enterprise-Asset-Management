@@ -19,6 +19,10 @@ const roleNames = {
 
 async function loginInBrowser(page: Page, email: string) {
   await page.goto("/login");
+  await submitLoginForm(page, email);
+}
+
+async function submitLoginForm(page: Page, email: string) {
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: /sign in securely/i }).click();
@@ -48,7 +52,11 @@ async function apiRequest(
 }
 
 test.describe("first-run and release workflows", () => {
-  test("first-run setup creates a Super Admin and sample records", async ({ page, request }) => {
+  test("sample-data setup immediately allows Super Admin sign-in without a reload", async ({ page, request }) => {
+    let setupRequestCount = 0;
+    page.on("request", (browserRequest) => {
+      if (browserRequest.url().endsWith("/api/v1/setup/initial-admin")) setupRequestCount += 1;
+    });
     await page.goto("/login");
     await expect(page.getByText("First-run setup", { exact: false })).toBeVisible();
     await page.getByLabel("Full name").fill(roleNames.administrator);
@@ -58,15 +66,53 @@ test.describe("first-run and release workflows", () => {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.getByRole("button", { name: /yes, create sample data/i }).click();
     await page.getByRole("button", { name: /review & create/i }).click();
-    await expect(page.getByText("Your EAMMS workspace is ready")).toBeVisible();
-    await page.getByRole("button", { name: /continue to sign in/i }).click();
-    await page.goto("/login");
-    await loginInBrowser(page, emails.administrator);
+    await expect(page.getByRole("heading", { name: "Sign in to your workspace" })).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("sample data completed successfully");
+    await expect(page.getByLabel("Email address")).toHaveValue(emails.administrator);
+    await expect(page.getByRole("button", { name: /review & create/i })).toHaveCount(0);
+    await expect.poll(() => setupRequestCount).toBe(1);
+    await submitLoginForm(page, emails.administrator);
+
+    const repeatSetup = await request.post(`${apiBase}/api/v1/setup/initial-admin`, {
+      data: { full_name: roleNames.administrator, email: emails.administrator, password, confirm_password: password, sample_data: true },
+    });
+    expect(repeatSetup.status()).toBe(409);
 
     const token = await getAccessToken(request, emails.administrator);
     const assets = await apiRequest(request, token, "GET", "/assets?page_size=100");
     expect(assets.status()).toBe(200);
     expect((await assets.json()).total).toBeGreaterThan(0);
+  });
+
+  test("empty first-run setup immediately allows sign-in and cannot be submitted again", async ({ page, request }) => {
+    let setupRequestCount = 0;
+    page.on("request", (browserRequest) => {
+      if (browserRequest.url().endsWith("/api/v1/setup/initial-admin")) setupRequestCount += 1;
+    });
+    await page.goto("/login");
+    await expect(page.getByText("First-run setup", { exact: false })).toBeVisible();
+    await page.getByLabel("Full name").fill("E2E Empty Administrator");
+    await page.getByLabel("Email address").fill(emails.administrator);
+    await page.getByLabel(/^Password/).fill(password);
+    await page.getByLabel("Confirm password").fill(password);
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: /no, start empty/i }).click();
+    await page.getByRole("button", { name: /review & create/i }).click();
+    await expect(page.getByRole("heading", { name: "Sign in to your workspace" })).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("Workspace setup completed successfully");
+    await expect(page.getByLabel("Email address")).toHaveValue(emails.administrator);
+    await expect(page.getByRole("button", { name: /review & create/i })).toHaveCount(0);
+    await expect.poll(() => setupRequestCount).toBe(1);
+    await submitLoginForm(page, emails.administrator);
+
+    const accessToken = await getAccessToken(request, emails.administrator);
+    const assets = await apiRequest(request, accessToken, "GET", "/assets?page_size=100");
+    expect(assets.status()).toBe(200);
+    expect((await assets.json()).total).toBe(0);
+    const repeatSetup = await request.post(`${apiBase}/api/v1/setup/initial-admin`, {
+      data: { full_name: "E2E Empty Administrator", email: emails.administrator, password, confirm_password: password, sample_data: false },
+    });
+    expect(repeatSetup.status()).toBe(409);
   });
 
   test("all roles, core operations, exports, themes, and responsive navigation work", async ({ browser, request }) => {

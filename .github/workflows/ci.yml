@@ -77,7 +77,14 @@ jobs:
         run: npm ci && npx playwright install --with-deps chromium
       - name: Run browser workflows
         working-directory: frontend
-        run: npm run e2e
+        run: npm run e2e -- --grep-invert "empty first-run setup"
+      - name: Recreate isolated database for empty setup workflow
+        run: |
+          docker compose -f docker-compose.e2e.yml -p eamms-release-e2e down --remove-orphans
+          docker compose -f docker-compose.e2e.yml -p eamms-release-e2e up --build --detach --wait
+      - name: Verify empty setup and immediate sign-in
+        working-directory: frontend
+        run: npm run e2e -- --grep "empty first-run setup"
       - name: Remove disposable E2E containers
         if: always()
         run: docker compose -f docker-compose.e2e.yml -p eamms-release-e2e down --remove-orphans
